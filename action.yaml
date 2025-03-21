@@ -5,10 +5,18 @@ inputs:
     description: "base64 encoded certificate in .p12 format"
     required: true
     default: "invalid"
+  certificate_password:
+    description: "password to unlock the .p12 certificate"
+    required: false
+    default: ""
   provisioning_profile_base64:
     description: "base64 encoded provisioning profile"
     required: true
     default: "invalid"
+  keychain_password:
+    description: "password for the generated keychain"
+    required: false
+    default: ""
 runs:
   using: "composite"
   steps:
@@ -16,7 +24,9 @@ runs:
     shell: bash
     env:
       BUILD_CERTIFICATE_BASE64: ${{ inputs.certificate_base64 }}
+      P12_PASSWORD: ${{ inputs.certificate_password }}
       BUILD_PROVISION_PROFILE_BASE64: ${{ inputs.provisioning_profile_base64 }}
+      KEYCHAIN_PASSWORD: ${{ inputs.keychain_password }}
     run: |
       CERTIFICATE_PATH=$RUNNER_TEMP/build_certificate.p12
       PP_PATH=$RUNNER_TEMP/build_pp.mobileprovision
@@ -25,14 +35,16 @@ runs:
       echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
       echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode -o $PP_PATH
 
-      if [ -r "$KEYCHAIN_PATH" ]; then
-        security delete-keychain $KEYCHAIN_PATH
-      fi
-      security create-keychain -p "" $KEYCHAIN_PATH
+      security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
       security set-keychain-settings $KEYCHAIN_PATH
-      security unlock-keychain -p "" $KEYCHAIN_PATH
+      security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
 
-      security import $CERTIFICATE_PATH -P "" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+      security import $CERTIFICATE_PATH -P "$P12_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+      if [ -n "$KEYCHAIN_PASSWORD" ]; then
+        security set-key-partition-list -S apple-tool:,apple: -k "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+      else
+        security set-key-partition-list -S apple-tool:,apple: $KEYCHAIN_PATH
+      fi
       security list-keychain -d user -s $KEYCHAIN_PATH
 
       mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
