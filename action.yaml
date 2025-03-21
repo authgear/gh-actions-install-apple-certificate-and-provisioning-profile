@@ -25,6 +25,9 @@ runs:
       echo -n "$BUILD_CERTIFICATE_BASE64" | base64 --decode -o $CERTIFICATE_PATH
       echo -n "$BUILD_PROVISION_PROFILE_BASE64" | base64 --decode -o $PP_PATH
 
+      if [ -r "$KEYCHAIN_PATH" ]; then
+        security delete-keychain $KEYCHAIN_PATH
+      fi
       security create-keychain -p "" $KEYCHAIN_PATH
       security set-keychain-settings $KEYCHAIN_PATH
       security unlock-keychain -p "" $KEYCHAIN_PATH
